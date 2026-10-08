@@ -82,7 +82,7 @@ cookie 落盘的瞬间（`chrome.cookies.onChanged`），自动把刚才那篇�
 ## 七、安装与验收（Chrome）
 
 1. 打开 `chrome://extensions/` → 右上角开「开发者模式」
-2. 「加载已解压的扩展程序」→ 选本目录（`myExoMindExtension/`）
+2. 「加载已解压的扩展程序」→ 选本目录（`exomind-extension/`）
 3. 验收清单：
    - [ ] 已在浏览器登录过 youhuale.cn → popup 显示「● 已就绪」→ 点「存入知识飞轮」→ 绿色「已存入」
    - [ ] 到 `youhuale.cn/ui/browser?dir=raw` 看到刚存的 `raw/articles/` 页面，frontmatter 带 `source_url`
