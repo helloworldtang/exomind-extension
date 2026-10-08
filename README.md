@@ -51,7 +51,7 @@ cookie 落盘的瞬间（`chrome.cookies.onChanged`），自动把刚才那篇�
 
 **做**
 - popup 一键存当前页：`{url, title, tags?, client_content?}` → `POST /ingest/async`（服务端自己抓正文）
-- 登录态 SPA 兜底：豆包对话/知乎登录墙类页面服务端只抓得到标题，插件随请求带页面可见文本（activeTab 取 `innerText`，截 3 万字），**服务端抓空时才启用**（trafilatura 质量优先）；提取两级去噪——**划词优先**（选中 ≥50 字即只存选中内容，聊天气泡场景零噪音）+ 语义去噪（读前临时隐藏 nav/aside/header/footer，单换行转段落换行防 markdown 黏连）
+- 登录态 SPA 兜底：豆包对话/知乎登录墙类页面服务端只抓得到标题，插件随请求带页面可见文本（activeTab 取 `innerText`，截 3 万字），**服务端抓空时才启用**（trafilatura 质量优先）；提取三级去噪——**划词优先**（选中 ≥50 字即只存选中内容，聊天气泡场景零噪音）+ 语义去噪（读前临时隐藏 nav/aside/header/footer/textarea，单换行转段落换行防 markdown 黏连）+ 尾部短行修剪（剥掉「对话/图像生成/更多」类输入框工具条按钮串）
 - 存完即时反馈：「已存入，AI 正在整理」+ 最近存入列表（有确定性）
 - 状态指示：● 已就绪 / ● 未登录，不出现 cookie/token/密钥等词
 - 未登录引导 + 登录后自动补存（见上）

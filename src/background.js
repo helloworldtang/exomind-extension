@@ -54,17 +54,25 @@ async function grabClientContent(tab) {
         // ② 语义去噪：读 innerText 前临时隐藏 nav/aside/header/footer
         // （侧栏菜单/顶栏快捷键是 body.innerText 的主要噪音源），读完恢复。
         // 不能用 cloneNode：脱离文档的节点 innerText 退化为 textContent，换行全丢。
-        const NOISE = "nav,aside,header,footer,[aria-hidden='true']";
+        const NOISE =
+          "nav,aside,header,footer,[aria-hidden='true'],textarea,[contenteditable='true']";
         const saved = [];
         document.querySelectorAll(NOISE).forEach((el) => {
           saved.push([el, el.style.display]);
           el.style.display = "none";
         });
-        let text = document.body?.innerText ?? "";
+        let lines = (document.body?.innerText ?? "").split("\n");
         saved.forEach(([el, display]) => (el.style.display = display));
+        // ③ 尾部工具条修剪：聊天输入框上方的功能按钮（「对话/图像生成/帮我写作/
+        // 更多」）不是语义标签，DOM 层剥不掉；它们的文本特征是成串短行——
+        // 从末尾往前删 ≤12 字的短行，直到碰到实质内容行。时间戳（「今天 20:41」）一并清掉。
+        while (lines.length) {
+          const last = lines[lines.length - 1].trim();
+          if (!last || last.length <= 12) lines.pop();
+          else break;
+        }
         // innerText 的单换行在 markdown 渲染里会黏连成一句，转成段落换行
-        text = text.replace(/\n(?!\n)/g, "\n\n");
-        return text;
+        return lines.join("\n").replace(/\n(?!\n)/g, "\n\n");
       },
     });
     return String(res?.result ?? "").slice(0, CLIENT_CONTENT_MAX);
