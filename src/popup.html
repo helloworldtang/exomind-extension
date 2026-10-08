@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>ExoMind 剪藏</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1f2328;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --brand: #3b6ef6;
+      --brand-weak: #eef2ff;
+      --ok: #16a34a;
+      --warn: #d97706;
+      --err: #dc2626;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 320px;
+      font: 13px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px 0;
+    }
+    .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+    .dot.warn { background: var(--warn); }
+    main { padding: 10px 14px 14px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font: inherit;
+      color: var(--fg);
+      background: #fafafa;
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--brand); background: #fff; }
+    button {
+      width: 100%;
+      margin-top: 14px;
+      padding: 10px 0;
+      border: 0;
+      border-radius: 8px;
+      background: var(--brand);
+      color: #fff;
+      font: 600 14px/1 inherit;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.05); }
+    button:disabled { opacity: 0.55; cursor: default; }
+    button.ghost {
+      background: var(--brand-weak);
+      color: var(--brand);
+    }
+    #result { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; display: none; }
+    #result.ok { display: block; background: #f0fdf4; color: var(--ok); }
+    #result.err { display: block; background: #fef2f2; color: var(--err); }
+    #result.info { display: block; background: var(--brand-weak); color: var(--brand); }
+    #recent { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; display: none; }
+    #recent h4 { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+    #recent ul { list-style: none; }
+    #recent li {
+      font-size: 12px;
+      color: var(--fg);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 2px 0;
+    }
+    #recent li::before { content: "·"; color: var(--muted); margin-right: 6px; }
+    footer {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 14px;
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+    }
+    footer a { color: var(--muted); text-decoration: none; cursor: pointer; }
+    footer a:hover { color: var(--brand); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">…</span></div>
+  </header>
+
+  <main>
+    <!-- 已就绪：一键存入 -->
+    <section id="saveForm">
+      <label for="title">标题</label>
+      <input type="text" id="title" placeholder="网页标题" />
+      <label for="tags">标签（可选，逗号分隔）</label>
+      <input type="text" id="tags" placeholder="例如：AI, 产品" />
+      <button id="saveBtn">存入知识飞轮</button>
+      <div id="result"></div>
+    </section>
+
+    <!-- 未登录：引导，不出现任何术语 -->
+    <section id="loginGuide" class="hidden">
+      <p style="margin:6px 0 2px">登录 ExoMind 后，就能一键把网页存进你的知识飞轮。</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:6px">
+        登录完成会自动把刚才的网页存进去，不用回来再点一次。
+      </p>
+      <button id="loginBtn">去登录</button>
+      <div id="result2"></div>
+    </section>
+
+    <div id="recent">
+      <h4>最近存入</h4>
+      <ul id="recentList"></ul>
+    </div>
+  </main>
+
+  <footer>
+    <a id="openHome">打开知识飞轮</a>
+    <a id="openOptions">设置</a>
+  </footer>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

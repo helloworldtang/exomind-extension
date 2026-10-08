@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>ExoMind 剪藏 · 设置</title>
+  <style>
+    :root {
+      --fg: #1f2328;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --brand: #3b6ef6;
+      --ok: #16a34a;
+      --err: #dc2626;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      max-width: 560px;
+      margin: 48px auto;
+      padding: 0 24px;
+      font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--fg);
+    }
+    h1 { font-size: 18px; margin-bottom: 4px; }
+    .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+    .card { border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+    .hint { background: #f9fafb; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font: inherit;
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--brand); }
+    .row { display: flex; gap: 10px; margin-top: 14px; }
+    button {
+      padding: 9px 18px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--brand);
+      color: #fff;
+      font: 600 13px/1 inherit;
+      cursor: pointer;
+    }
+    button.ghost { background: #f3f4f6; color: var(--fg); }
+    #msg { margin-top: 12px; font-size: 13px; }
+    #msg.ok { color: var(--ok); }
+    #msg.err { color: var(--err); }
+  </style>
+</head>
+<body>
+  <h1>设置</h1>
+  <p class="sub">ExoMind 剪藏</p>
+
+  <div class="card">
+    <div class="hint">
+      一般不用填。<br />
+      只要你在浏览器登录过 <b>youhuale.cn</b>，插件会自动使用你的登录状态。<br />
+      只有当你<b>从不在浏览器登录</b>（例如只用命令行）时，才需要在这里粘贴一个访问密钥：
+      打开 <a href="https://youhuale.cn/ui/account" target="_blank">youhuale.cn/ui/account</a> → 新建密钥 → 复制粘贴到下面。
+    </div>
+    <label for="apiKey">访问密钥（可选）</label>
+    <input type="text" id="apiKey" placeholder="sk_…" autocomplete="off" spellcheck="false" />
+    <div class="row">
+      <button id="save">保存</button>
+      <button id="test" class="ghost">测试连通</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
