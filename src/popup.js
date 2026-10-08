@@ -118,8 +118,13 @@ els.openHome.addEventListener("click", () => {
   window.close();
 });
 
-els.openOptions.addEventListener("click", () => {
-  chrome.runtime.openOptionsPage();
+els.openOptions.addEventListener("click", async () => {
+  try {
+    await chrome.runtime.openOptionsPage();
+  } catch {
+    // 个别 Chrome 版本 openOptionsPage 静默失败,直接开 URL 兜底
+    await chrome.tabs.create({ url: chrome.runtime.getURL("src/options.html") });
+  }
   window.close();
 });
 
