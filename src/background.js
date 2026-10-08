@@ -47,7 +47,25 @@ async function grabClientContent(tab) {
     if (!target?.id || !/^https?:/i.test(target.url ?? "")) return "";
     const [res] = await chrome.scripting.executeScript({
       target: { tabId: target.id },
-      func: () => document.body?.innerText ?? "",
+      func: () => {
+        // ① 划词优先：选中即意图——聊天气泡/长文里精准截取，天然零噪音
+        const sel = String(window.getSelection?.() ?? "").trim();
+        if (sel.length >= 50) return sel;
+        // ② 语义去噪：读 innerText 前临时隐藏 nav/aside/header/footer
+        // （侧栏菜单/顶栏快捷键是 body.innerText 的主要噪音源），读完恢复。
+        // 不能用 cloneNode：脱离文档的节点 innerText 退化为 textContent，换行全丢。
+        const NOISE = "nav,aside,header,footer,[aria-hidden='true']";
+        const saved = [];
+        document.querySelectorAll(NOISE).forEach((el) => {
+          saved.push([el, el.style.display]);
+          el.style.display = "none";
+        });
+        let text = document.body?.innerText ?? "";
+        saved.forEach(([el, display]) => (el.style.display = display));
+        // innerText 的单换行在 markdown 渲染里会黏连成一句，转成段落换行
+        text = text.replace(/\n(?!\n)/g, "\n\n");
+        return text;
+      },
     });
     return String(res?.result ?? "").slice(0, CLIENT_CONTENT_MAX);
   } catch {
