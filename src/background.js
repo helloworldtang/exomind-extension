@@ -36,6 +36,25 @@ async function currentTab() {
   return tab;
 }
 
+// 兜底正文：登录态 SPA（豆包对话等）服务端只抓得到标题一行，页面可见文本
+// 只存在于用户浏览器里。随请求带上 client_content，服务端抓空时才启用
+// （trafilatura 质量优先）。取不到（chrome:// 页/无权限）就只发 URL。
+const CLIENT_CONTENT_MAX = 30000; // 与服务端 MAX_INGEST_CONTENT 对齐
+
+async function grabClientContent(tab) {
+  try {
+    const target = tab ?? (await currentTab());
+    if (!target?.id || !/^https?:/i.test(target.url ?? "")) return "";
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId: target.id },
+      func: () => document.body?.innerText ?? "",
+    });
+    return String(res?.result ?? "").slice(0, CLIENT_CONTENT_MAX);
+  } catch {
+    return "";
+  }
+}
+
 async function rememberRecent(entry) {
   const { [RECENT_KEY]: list = [] } = await chrome.storage.local.get(RECENT_KEY);
   list.unshift(entry);
@@ -43,17 +62,20 @@ async function rememberRecent(entry) {
 }
 
 /** 存入主流程。失败不抛——统一返回 {ok, ...}，popup 只管渲染。 */
-async function submit({ url, title, tags } = {}) {
+async function submit({ url, title, tags, clientContent } = {}) {
   if (!url || !/^https?:/i.test(url)) {
     return { ok: false, message: "这个页面存不了（不是普通网页）" };
   }
+  // 兜底正文在「点存入的那一刻」抓：登录后自动补存时活动页已是登录页，
+  // 那时再抓就取到登录页文本了——所以 pending 里必须存原始快照。
+  if (clientContent === undefined) clientContent = await grabClientContent();
   const cred = await resolveCredential();
   if (!cred) {
-    pendingIngest = { url, title, tags };
+    pendingIngest = { url, title, tags, clientContent };
     return { ok: false, needLogin: true };
   }
   try {
-    const data = await ingestAsync({ url, title, tags }, cred);
+    const data = await ingestAsync({ url, title, tags, clientContent }, cred);
     await rememberRecent({
       jobId: data.job_id,
       title: title || url,
@@ -64,7 +86,7 @@ async function submit({ url, title, tags } = {}) {
   } catch (e) {
     if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
       // 会话过期：引导重新登录，登录后自动补存
-      pendingIngest = { url, title, tags };
+      pendingIngest = { url, title, tags, clientContent };
       return { ok: false, needLogin: true, message: e.message };
     }
     return { ok: false, message: e.message || "没存上，稍后再试" };
@@ -94,7 +116,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // 右键菜单：不打断阅读流。成败都落到 badge（✓ / !）。
 chrome.contextMenus.onClicked.addListener(async (_info, tab) => {
   if (!tab?.url) return;
-  const r = await submit({ url: tab.url, title: tab.title ?? "" });
+  const r = await submit({
+    url: tab.url,
+    title: tab.title ?? "",
+    clientContent: await grabClientContent(tab), // 右键场景显式指定 tab,不赌焦点
+  });
   if (r.ok) badge("✓", "#16a34a");
   else if (r.needLogin) badge("?", "#f59e0b");
   else badge("!", "#dc2626");

@@ -62,9 +62,10 @@ async function request(path, { method = "GET", body, headers = {} } = {}) {
 
 /**
  * 异步存入一个网页。服务端自己抓正文（trafilatura），失败自动重试 6 次。
+ * clientContent 是页面可见文本兜底：登录态 SPA 服务端抓空时才启用（备胎不是正文本体）。
  * 返回 {job_id, status, poll}。
  */
-export function ingestAsync({ url, title, tags }, cred) {
+export function ingestAsync({ url, title, tags, clientContent }, cred) {
   return request("/ingest/async", {
     method: "POST",
     headers: cred.headers,
@@ -73,6 +74,7 @@ export function ingestAsync({ url, title, tags }, cred) {
       title: title || undefined,
       tags: tags && tags.length ? tags : undefined,
       origin: ORIGIN_TAG,
+      client_content: clientContent || undefined,
     },
   });
 }

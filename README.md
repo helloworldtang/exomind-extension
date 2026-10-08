@@ -50,7 +50,8 @@ cookie 落盘的瞬间（`chrome.cookies.onChanged`），自动把刚才那篇�
 ## 四、MVP 范围（less is more）
 
 **做**
-- popup 一键存当前页：`{url, title, tags?}` → `POST /ingest/async`（服务端自己抓正文）
+- popup 一键存当前页：`{url, title, tags?, client_content?}` → `POST /ingest/async`（服务端自己抓正文）
+- 登录态 SPA 兜底：豆包对话/知乎登录墙类页面服务端只抓得到标题，插件随请求带页面可见文本（activeTab 取 `innerText`，截 3 万字），**服务端抓空时才启用**（trafilatura 质量优先）
 - 存完即时反馈：「已存入，AI 正在整理」+ 最近存入列表（有确定性）
 - 状态指示：● 已就绪 / ● 未登录，不出现 cookie/token/密钥等词
 - 未登录引导 + 登录后自动补存（见上）
@@ -58,7 +59,7 @@ cookie 落盘的瞬间（`chrome.cookies.onChanged`），自动把刚才那篇�
 - options：API Key 兜底 + 连通性测试（一般不用打开）
 
 **不做（v1 砍掉）**
-- 本地抽正文 / 划词剪藏（服务端 trafilatura 更强，且 URL 模式不受 30000 字符限制）
+- 本地抽正文作主链路 / 划词剪藏（服务端 trafilatura 更强；本地文本只作抓空时的兜底，见上；URL 模式不受 30000 字符限制）
 - 剪藏列表管理视图（`/ui/browser?dir=raw` 已能看）
 - 智能标签推荐、批量导入、Firefox/Safari 版、可配服务器地址（v1 固定 youhuale.cn）
 
