@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ExoMind 剪藏",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "看到好内容，一键存进你的知识飞轮",
   "permissions": ["cookies", "storage", "contextMenus", "activeTab", "scripting"],
   "host_permissions": ["https://youhuale.cn/"],

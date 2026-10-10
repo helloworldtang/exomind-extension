@@ -8,6 +8,7 @@
 import { resolveCredential } from "./lib/auth.js";
 import { ingestAsync, ApiError } from "./lib/api.js";
 import { SESSION_COOKIE, BASE_URL } from "./lib/config.js";
+import { pageExtractor } from "./lib/extract.js";
 
 const MENU_ID = "exomind-save-page";
 const RECENT_KEY = "recentIngests";
@@ -37,47 +38,27 @@ async function currentTab() {
 }
 
 // 兜底正文：登录态 SPA（豆包对话等）服务端只抓得到标题一行，页面可见文本
-// 只存在于用户浏览器里。随请求带上 client_content，服务端抓空时才启用
-// （trafilatura 质量优先）。取不到（chrome:// 页/无权限）就只发 URL。
-const CLIENT_CONTENT_MAX = 30000; // 与服务端 MAX_INGEST_CONTENT 对齐
+// 只存在于用户浏览器里。提取走 extract.js 的站点策略（doubao 精确命中 →
+// generic 兜底），返回 {title, text}：title 是策略拿到的干净标题（如豆包
+// 会话标题），text 截 3 万字（与服务端 MAX_INGEST_CONTENT 对齐）后随
+// client_content 上送，服务端抓空时才启用（trafilatura 质量优先）。
+const CLIENT_CONTENT_MAX = 30000;
 
 async function grabClientContent(tab) {
   try {
     const target = tab ?? (await currentTab());
-    if (!target?.id || !/^https?:/i.test(target.url ?? "")) return "";
+    if (!target?.id || !/^https?:/i.test(target.url ?? "")) return { title: "", text: "" };
     const [res] = await chrome.scripting.executeScript({
       target: { tabId: target.id },
-      func: () => {
-        // ① 划词优先：选中即意图——聊天气泡/长文里精准截取，天然零噪音
-        const sel = String(window.getSelection?.() ?? "").trim();
-        if (sel.length >= 50) return sel;
-        // ② 语义去噪：读 innerText 前临时隐藏 nav/aside/header/footer
-        // （侧栏菜单/顶栏快捷键是 body.innerText 的主要噪音源），读完恢复。
-        // 不能用 cloneNode：脱离文档的节点 innerText 退化为 textContent，换行全丢。
-        const NOISE =
-          "nav,aside,header,footer,[aria-hidden='true'],textarea,[contenteditable='true']";
-        const saved = [];
-        document.querySelectorAll(NOISE).forEach((el) => {
-          saved.push([el, el.style.display]);
-          el.style.display = "none";
-        });
-        let lines = (document.body?.innerText ?? "").split("\n");
-        saved.forEach(([el, display]) => (el.style.display = display));
-        // ③ 尾部工具条修剪：聊天输入框上方的功能按钮（「对话/图像生成/帮我写作/
-        // 更多」）不是语义标签，DOM 层剥不掉；它们的文本特征是成串短行——
-        // 从末尾往前删 ≤12 字的短行，直到碰到实质内容行。时间戳（「今天 20:41」）一并清掉。
-        while (lines.length) {
-          const last = lines[lines.length - 1].trim();
-          if (!last || last.length <= 12) lines.pop();
-          else break;
-        }
-        // innerText 的单换行在 markdown 渲染里会黏连成一句，转成段落换行
-        return lines.join("\n").replace(/\n(?!\n)/g, "\n\n");
-      },
+      func: pageExtractor,
     });
-    return String(res?.result ?? "").slice(0, CLIENT_CONTENT_MAX);
+    const r = res?.result ?? {};
+    return {
+      title: String(r.title ?? ""),
+      text: String(r.text ?? "").slice(0, CLIENT_CONTENT_MAX),
+    };
   } catch {
-    return "";
+    return { title: "", text: "" };
   }
 }
 
@@ -88,20 +69,28 @@ async function rememberRecent(entry) {
 }
 
 /** 存入主流程。失败不抛——统一返回 {ok, ...}，popup 只管渲染。 */
-async function submit({ url, title, tags, clientContent } = {}) {
+async function submit({ url, title, tags, client } = {}) {
   if (!url || !/^https?:/i.test(url)) {
     return { ok: false, message: "这个页面存不了（不是普通网页）" };
   }
   // 兜底正文在「点存入的那一刻」抓：登录后自动补存时活动页已是登录页，
   // 那时再抓就取到登录页文本了——所以 pending 里必须存原始快照。
-  if (clientContent === undefined) clientContent = await grabClientContent();
+  if (client === undefined) {
+    client = await grabClientContent();
+    // 策略标题仅在「用户没改过 popup 里的标题」时生效：传来的 title 还等于
+    // tab 原始标题说明是预填值，替换成策略的干净标题（豆包会话标题）；
+    // 用户手改过（≠ tab 标题）则尊重用户。
+    if (client.title && title && title === (await currentTab())?.title) {
+      title = client.title;
+    }
+  }
   const cred = await resolveCredential();
   if (!cred) {
-    pendingIngest = { url, title, tags, clientContent };
+    pendingIngest = { url, title, tags, client };
     return { ok: false, needLogin: true };
   }
   try {
-    const data = await ingestAsync({ url, title, tags, clientContent }, cred);
+    const data = await ingestAsync({ url, title, tags, clientContent: client.text }, cred);
     await rememberRecent({
       jobId: data.job_id,
       title: title || url,
@@ -112,7 +101,7 @@ async function submit({ url, title, tags, clientContent } = {}) {
   } catch (e) {
     if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
       // 会话过期：引导重新登录，登录后自动补存
-      pendingIngest = { url, title, tags, clientContent };
+      pendingIngest = { url, title, tags, client };
       return { ok: false, needLogin: true, message: e.message };
     }
     return { ok: false, message: e.message || "没存上，稍后再试" };
@@ -145,7 +134,7 @@ chrome.contextMenus.onClicked.addListener(async (_info, tab) => {
   const r = await submit({
     url: tab.url,
     title: tab.title ?? "",
-    clientContent: await grabClientContent(tab), // 右键场景显式指定 tab,不赌焦点
+    client: await grabClientContent(tab), // 右键场景显式指定 tab,不赌焦点
   });
   if (r.ok) badge("✓", "#16a34a");
   else if (r.needLogin) badge("?", "#f59e0b");
