@@ -8,11 +8,11 @@
 
 ## 〇、当前状态（2026-10-09 核查）
 
-**需求已实现并上线。** 插件 v0.3.0（已推送 GitHub），服务端配套已部署到 ECS 并运行。
+**需求已实现并上线。** 插件 v0.3.1（已推送 GitHub），服务端配套已部署到 ECS 并运行。
 
 | 环节 | 状态 | 证据 |
 |---|---|---|
-| 插件 | ✅ v0.3.0，工作区干净，已推 origin/main | `git log`（未推送 commit 数 = 0） |
+| 插件 | ✅ v0.3.1，工作区干净，已推 origin/main | `git log`（未推送 commit 数 = 0） |
 | 服务端配套 | ✅ `client_content` 字段 + 空正文守卫 + 兜底 LLM 标题 | ECS `query.py:1491/3414`、`queue.py:688`，代码落盘 10-08 21:11/21:19 |
 | 服务运行 | ✅ `systemctl is-active exomind` = active | workbench exec |
 | 真机验收 | ✅ 已跑过（豆包对话登录态页踩坑 → 迭代 v0.2.0~v0.3.0） | commit 5925523 / 34b2ecd / d0e6180 |
@@ -113,7 +113,7 @@ manifest 实际声明：`cookies` / `storage` / `contextMenus` / `activeTab` / `
 
 ```
 exomind-extension/
-├── manifest.json          # MV3 v0.3.0
+├── manifest.json          # MV3 v0.3.1
 ├── src/
 │   ├── background.js      # service worker：右键菜单、发请求、登录补存、badge、页面正文兜底
 │   ├── popup.html/js      # 一键存入 UI（状态、标题、标签、反馈、最近存入）
@@ -137,3 +137,4 @@ exomind-extension/
 | v0.2.1 | 兜底正文两级去噪：划词优先 + 语义隐藏 |
 | v0.2.2 | 去噪第三级：尾部短行修剪，剥输入框工具条 |
 | v0.3.0 | 站点策略层：doubao 策略（会话标题 + main 容器 + 豆包噪音词过滤）→ generic 兜底（main 容器优先 + 控件词行过滤）；收口待决项①（用户/会话标题优先于 LLM 起标题） |
+| v0.3.1 | doubao 噪音源改 DOM 级隐藏（testid 精确剥除建议卡片/按钮排/技能条/输入框）；代码块结构保真评估低 ROI 不做 |
