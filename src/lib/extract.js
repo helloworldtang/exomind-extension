@@ -13,9 +13,10 @@ export function pageExtractor() {
   // 控件词：孤立成行的按钮/标签文本（豆包「运行」「表格」，通用「复制」「分享」）
   const CONTROL_LINE = /^(运行|表格|复制|复制代码|分享|重新生成|继续生成|点赞|点踩|朗读|编辑|\w+\s*运行)$/;
 
-  function readText(root) {
+  function readText(root, extraNoise = "") {
+    const selector = extraNoise ? `${NOISE},${extraNoise}` : NOISE;
     const saved = [];
-    root.querySelectorAll(NOISE).forEach((el) => {
+    root.querySelectorAll(selector).forEach((el) => {
       saved.push([el, el.style.display]);
       el.style.display = "none";
     });
@@ -39,21 +40,33 @@ export function pageExtractor() {
     return out.join("\n").replace(/\n(?!\n)/g, "\n\n");
   }
 
-  // ---- 豆包策略（DOM 依据 2026-10-09 实测探测）----
+  // ---- 豆包策略（DOM 依据 2026-10-09/10 两轮实测探测）----
   // - document.title =「<会话标题> - 豆包」，会话级标题，剥品牌后缀即用
   // - 对话区在 <main>；侧栏是独立 <nav data-testid=chat_route_layout_leftside_nav>
-  // - 免责声明「AI 生成可能有误 / 请核实」固定在正文前；建议卡片「生成研究报告:…」；
-  //   消息间时间戳「今天 14:47」
+  // - 噪音源都有稳定 testid：建议卡片 suggest_message_list、消息按钮排
+  //   message_action_bar、底部技能条 guidance-skill-bar、输入框 chat_input——
+  //   DOM 级隐藏比文本正则稳（正则只认得「生成研究报告:」前缀，这里剥掉全部建议卡片）
+  // - 免责声明「AI 生成可能有误 / 请核实」与消息间时间戳「今天 14:47」无容器
+  //   testid，仍走文本层过滤；代码块/表格是私有组件（实测 main 内 pre/table 均为 0），
+  //   结构保真 ROI 低，不做
   function doubao() {
     const title = document.title.replace(/\s*[-–—]\s*豆包\s*$/, "").trim();
     const container = document.querySelector("main") ?? document.body;
-    const text = cleanLines(readText(container), [
-      /^AI ?生成可能有误$/,
-      /^请核实$/,
-      /^生成研究报告[:：]/,
-      /^(今天|昨天)\s*\d{1,2}:\d{2}$/,
-      /^\d{1,2}:\d{2}$/,
-    ]);
+    const text = cleanLines(
+      readText(
+        container,
+        '[data-testid="suggest_message_list"], [data-testid="message_action_bar"], ' +
+          '[data-testid="guidance-skill-bar"], [data-testid="chat_input"], ' +
+          '[data-testid="to-bottom-button"]'
+      ),
+      [
+        /^AI ?生成可能有误$/,
+        /^请核实$/,
+        /^生成研究报告[:：]/,
+        /^(今天|昨天)\s*\d{1,2}:\d{2}$/,
+        /^\d{1,2}:\d{2}$/,
+      ]
+    );
     return { title, text };
   }
 
