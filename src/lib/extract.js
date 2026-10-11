@@ -44,11 +44,10 @@ export function pageExtractor() {
   // - document.title =「<会话标题> - 豆包」，会话级标题，剥品牌后缀即用
   // - 对话区在 <main>；侧栏是独立 <nav data-testid=chat_route_layout_leftside_nav>
   // - 噪音源都有稳定 testid：建议卡片 suggest_message_list、消息按钮排
-  //   message_action_bar、底部技能条 guidance-skill-bar、输入框 chat_input——
-  //   DOM 级隐藏比文本正则稳（正则只认得「生成研究报告:」前缀，这里剥掉全部建议卡片）
-  // - 免责声明「AI 生成可能有误 / 请核实」与消息间时间戳「今天 14:47」无容器
-  //   testid，仍走文本层过滤；代码块/表格是私有组件（实测 main 内 pre/table 均为 0），
-  //   结构保真 ROI 低，不做
+  //   message_action_bar、底部技能条 guidance-skill-bar、输入框 chat_input、
+  //   免责声明条 conversation_header_tip_text——DOM 级隐藏比文本正则稳
+  // - 消息间时间戳「今天 14:47」无容器 testid，仍走文本层过滤；代码块/表格
+  //   是私有组件（实测 main 内 pre/table 均为 0），结构保真 ROI 低，不做
   function doubao() {
     const title = document.title.replace(/\s*[-–—]\s*豆包\s*$/, "").trim();
     const container = document.querySelector("main") ?? document.body;
@@ -57,11 +56,13 @@ export function pageExtractor() {
         container,
         '[data-testid="suggest_message_list"], [data-testid="message_action_bar"], ' +
           '[data-testid="guidance-skill-bar"], [data-testid="chat_input"], ' +
-          '[data-testid="to-bottom-button"]'
+          '[data-testid="to-bottom-button"], [data-testid="conversation_header_tip_text"]'
       ),
       [
-        /^AI ?生成可能有误$/,
-        /^请核实$/,
+        // 免责声明实测是一行「AI 生成可能有误 请核实/注意核实」——前缀匹配,
+        // 别按两行写死(2026-10-11 线上 raw 实证踩坑)
+        /^AI ?生成可能有误/,
+        /^(请|注意)核实$/,
         /^生成研究报告[:：]/,
         /^(今天|昨天)\s*\d{1,2}:\d{2}$/,
         /^\d{1,2}:\d{2}$/,
