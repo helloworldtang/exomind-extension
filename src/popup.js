@@ -18,6 +18,8 @@ const els = {
   result2: $("result2"),
   recent: $("recent"),
   recentList: $("recentList"),
+  openHome: $("openHome"),
+  openOptions: $("openOptions"),
 };
 
 function showResult(el, kind, text) {
@@ -92,6 +94,9 @@ async function save() {
   }
 }
 
+// 先启动渲染主干，再挂监听器：任何一个监听器注册出错都不该拖死整个 popup
+boot();
+
 els.saveBtn.addEventListener("click", save);
 
 els.loginBtn.addEventListener("click", async () => {
@@ -127,5 +132,3 @@ els.openOptions.addEventListener("click", async () => {
   }
   window.close();
 });
-
-boot();
