@@ -5,16 +5,24 @@
 //   （chrome.cookies.onChanged）→ 自动把刚才那篇存进去。
 //   用户不需要「存完 → 登录 → 回来再点一次」。
 
-import { resolveCredential } from "./lib/auth.js";
+import { resolveCredential, authState, AUTH } from "./lib/auth.js";
 import { ingestAsync, ApiError } from "./lib/api.js";
-import { SESSION_COOKIE, BASE_URL } from "./lib/config.js";
+import { SESSION_COOKIE, BASE_URL, HOME_URL } from "./lib/config.js";
 import { pageExtractor } from "./lib/extract.js";
 
 const MENU_ID = "exomind-save-page";
 const RECENT_KEY = "recentIngests";
 const RECENT_MAX = 5;
 
-let pendingIngest = null;
+// MV3 service worker 空闲 ~30s 会被杀,纯内存暂存会静默丢失:
+// 「登录后自动补存」的待办落 storage.session(SW 重启不丢,关浏览器即清)。
+const PENDING_KEY = "pendingIngest";
+const setPending = (p) =>
+  p ? chrome.storage.session.set({ [PENDING_KEY]: p }) : chrome.storage.session.remove(PENDING_KEY);
+async function getPending() {
+  const { [PENDING_KEY]: p } = await chrome.storage.session.get(PENDING_KEY);
+  return p ?? null;
+}
 
 // 右键菜单入口没有 popup 承接结果，用 badge 反馈成败——静默失败最伤信任。
 // badge 留着不清，用户下次打开 popup 时由 popup 主动清掉。
@@ -86,7 +94,7 @@ async function submit({ url, title, tags, client } = {}) {
   }
   const cred = await resolveCredential();
   if (!cred) {
-    pendingIngest = { url, title, tags, client };
+    await setPending({ url, title, tags, client });
     return { ok: false, needLogin: true };
   }
   try {
@@ -101,17 +109,40 @@ async function submit({ url, title, tags, client } = {}) {
   } catch (e) {
     if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
       // 会话过期：引导重新登录，登录后自动补存
-      pendingIngest = { url, title, tags, client };
+      await setPending({ url, title, tags, client });
       return { ok: false, needLogin: true, message: e.message };
     }
     return { ok: false, message: e.message || "没存上，稍后再试" };
   }
 }
 
+// 登录态探活：token cookie 只有 24h，过期后浏览器里页面依然「无感可用」
+// （受保护页 302 → auth.ai-as.cc，SSO 长会话静默续签新 token），插件却只
+// 看得到过期的 token → 误判未登录。这里对受保护页发一次带凭证的请求，
+// 让 302 续签链在 cookie jar 里走完，新 token 落地后再查一次。
+// 前提：auth.ai-as.cc 在 host_permissions 里——扩展对其有权限的请求浏览器
+// 按同站处理，SameSite=Lax 的 SSO cookie 才会随 fetch 附带（fetch 非顶层
+// 导航，没有这条豁免 Lax 不会带）。
+async function probeLogin() {
+  try {
+    // HOME_URL(/ui/home) 是受保护页，中间件才会 302 到 /auth/authorize；
+    // 打 "/" 会命中公开 landing，续签链不触发。
+    await fetch(HOME_URL, { credentials: "include", redirect: "follow" });
+  } catch {
+    // 网络不通按未登录处理，不阻塞 popup
+  }
+  const { state } = await authState();
+  return state === AUTH.READY;
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "ingest") {
     submit(msg.payload).then(sendResponse);
     return true; // 异步响应
+  }
+  if (msg?.type === "probe-login") {
+    probeLogin().then((ok) => sendResponse({ ok }));
+    return true;
   }
   if (msg?.type === "get-context") {
     currentTab()
@@ -120,7 +151,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg?.type === "open-login") {
-    pendingIngest = msg.pending ?? pendingIngest;
+    if (msg.pending) setPending(msg.pending); // 不必等落盘:cookie 落地远晚于此
     chrome.tabs.create({ url: msg.loginUrl || BASE_URL });
     sendResponse({ ok: true });
     return false;
@@ -145,9 +176,9 @@ chrome.contextMenus.onClicked.addListener(async (_info, tab) => {
 chrome.cookies.onChanged.addListener(async (change) => {
   if (change.cookie?.name !== SESSION_COOKIE || change.removed) return;
   if (!change.cookie.domain?.includes("youhuale.cn")) return;
-  if (!pendingIngest) return;
-  const p = pendingIngest;
-  pendingIngest = null;
+  const p = await getPending();
+  if (!p) return;
+  await setPending(null);
   const result = await submit(p);
   // 通知 popup（若还开着）刷新状态与结果
   chrome.runtime.sendMessage({ type: "ingest-settled", result }).catch(() => {});

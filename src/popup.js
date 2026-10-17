@@ -54,6 +54,14 @@ async function boot() {
   const state = await authState();
   setMode(state.state);
 
+  // token 过期但 SSO 还活着时页面「看着一直登录着」，别急着判未登录：
+  // 让 background 探活走一遍 302 续签链，探完再定论。
+  if (state.state === AUTH.NEED_LOGIN) {
+    els.statusText.textContent = "检查登录态…";
+    const r = await chrome.runtime.sendMessage({ type: "probe-login" }).catch(() => null);
+    setMode(r?.ok ? AUTH.READY : AUTH.NEED_LOGIN);
+  }
+
   const ctx = await chrome.runtime.sendMessage({ type: "get-context" });
   if (ctx?.url) els.title.placeholder = ctx.title || "网页标题";
   els.title.value = ctx?.title || "";
