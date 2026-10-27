@@ -6,17 +6,17 @@
 
 ---
 
-## 〇、当前状态（2026-10-09 核查）
+## 〇、当前状态（2026-10-27 核查）
 
-**需求已实现并上线。** 插件 v0.3.1（已推送 GitHub），服务端配套已部署到 ECS 并运行。
+**需求已实现并上线。** 插件 v0.3.4（已推送 GitHub），服务端配套已部署到 ECS 并运行。
 
 | 环节 | 状态 | 证据 |
 |---|---|---|
-| 插件 | ✅ v0.3.1，工作区干净，已推 origin/main | `git log`（未推送 commit 数 = 0） |
+| 插件 | ✅ v0.3.4，工作区干净，已推 origin/main | commit `d588acc` |
 | 服务端配套 | ✅ `client_content` 字段 + 空正文守卫 + 兜底 LLM 标题 | ECS `query.py:1491/3414`、`queue.py:688`，代码落盘 10-08 21:11/21:19 |
 | 服务运行 | ✅ `systemctl is-active exomind` = active | workbench exec |
-| 真机验收 | ✅ 已跑过（豆包对话登录态页踩坑 → 迭代 v0.2.0~v0.3.0） | commit 5925523 / 34b2ecd / d0e6180 |
-| 上架 | ⬜ 未做（开发者模式自用） | 需 $5 + 审核 |
+| 真机验收 | ✅ 已跑过（豆包对话登录态页踩坑 → 迭代 v0.2.0~v0.3.4） | commit 5925523 / 34b2ecd / d0e6180 / d588acc |
+| 上架 | ⬜ 卡在开发者账户验证（老账户二次验证不过、新账户手机号验证不过，2026-10-27） | 当前开发者模式安装自用 |
 
 ## 一、需求理解
 
@@ -45,7 +45,7 @@
 | 层级 | 凭证 | 用户感知 |
 |---|---|---|
 | 1（默认） | `chrome.cookies` 读取 youhuale.cn 的 `token` cookie（HttpOnly，扩展特权可读），以 `Authorization: Bearer` 发送 | 装完即用，零配置 |
-| 2（过期/未登录） | 引导一键打开 youhuale.cn → 中间件 302 到登录 → auth.ai-as.cc SSO 会话若在则无感回跳 | 点一下「去登录」，多为秒过 |
+| 2（过期/未登录） | popup 先自动探活：后台 fetch 受保护页走 302 续签链（SSO 会话还在则无感拿到新 token，免手动开页）；SSO 也没了才引导打开 youhuale.cn 登录 | 多数时候无感；否则点一下「去登录」 |
 | 3（兜底） | options 页粘贴 API Key（`/ui/account` 生成），`X-API-Key` 发送 | 只给「从不在浏览器登录」的用户，藏在设置里 |
 
 **关键体验设计：登录后自动补存。** 未登录时点了存，插件记下 pending（含页面正文快照）；
@@ -76,8 +76,8 @@
 
 ## 五、权限面与风险
 
-manifest 实际声明：`cookies` / `storage` / `contextMenus` / `activeTab` / `scripting` + `host_permissions: youhuale.cn`。
-其中 `cookies` 是层级 1 的前提，`scripting` 是取页面可见文本的前提，两者都**只在 youhuale.cn 与当前活动页**范围内使用，未申请 `<all_urls>`。
+manifest 实际声明：`cookies` / `storage` / `contextMenus` / `activeTab` / `scripting` + `host_permissions: youhuale.cn、auth.ai-as.cc`。
+其中 `cookies` 是层级 1 的前提，`scripting` 是取页面可见文本的前提，两者都**只在 youhuale.cn 与当前活动页**范围内使用，未申请 `<all_urls>`。auth.ai-as.cc 是 v0.3.4 探活续签的前提：Chrome 对扩展持有 host permission 的域按同站处理，fetch 跟 302 到 auth 时 `SameSite=Lax` 的 SSO cookie 才会附带；插件不向该域发任何其他请求。
 
 | 风险 | 说明 | 应对 |
 |---|---|---|
@@ -105,6 +105,7 @@ manifest 实际声明：`cookies` / `storage` / `contextMenus` / `activeTab` / `
    - [x] 已在浏览器登录过 youhuale.cn → popup 显示「● 已就绪」→ 点「存入知识飞轮」→ 绿色「已存入」
    - [x] 到 `youhuale.cn/ui/browser?dir=raw` 看到 `raw/articles/` 页面，frontmatter 带 `source_url`
    - [x] 未登录（或清 cookie）→ popup 变「● 未登录」→ 点「去登录」→ 登录完成 → 那篇自动存入
+   - [x] 只删 youhuale.cn 的 `token` cookie（SSO 保留）→ popup「检查登录态…」→ 自动变「● 已就绪」（v0.3.4 探活）
    - [x] 右键 →「把这个网页存进知识飞轮」→ 图标出现 ✓（失败为 !）
    - [x] options「测试连通」显示 ✓
    - [x] 登录态 SPA（豆包对话页）→ 服务端抓空时启用页面可见文本兜底
@@ -113,7 +114,7 @@ manifest 实际声明：`cookies` / `storage` / `contextMenus` / `activeTab` / `
 
 ```
 exomind-extension/
-├── manifest.json          # MV3 v0.3.1
+├── manifest.json          # MV3 v0.3.4
 ├── src/
 │   ├── background.js      # service worker：右键菜单、发请求、登录补存、badge、页面正文兜底
 │   ├── popup.html/js      # 一键存入 UI（状态、标题、标签、反馈、最近存入）
@@ -138,3 +139,6 @@ exomind-extension/
 | v0.2.2 | 去噪第三级：尾部短行修剪，剥输入框工具条 |
 | v0.3.0 | 站点策略层：doubao 策略（会话标题 + main 容器 + 豆包噪音词过滤）→ generic 兜底（main 容器优先 + 控件词行过滤）；收口待决项①（用户/会话标题优先于 LLM 起标题） |
 | v0.3.1 | doubao 噪音源改 DOM 级隐藏（testid 精确剥除建议卡片/按钮排/技能条/输入框）；代码块结构保真评估低 ROI 不做 |
+| v0.3.2 | 修免责声明漏网：一行式「AI 生成可能有误 请核实」+ testid 容器 |
+| v0.3.3 | 修 popup 未登录误报：els 补 openHome/openOptions 键，boot() 前置防顶层炸点截断 |
+| v0.3.4 | 登录态探活：token 24h 过期但 SSO 长会话还在时，popup 自动走 302 续签链免手动开页（host_permissions 加 auth.ai-as.cc）；pendingIngest 落 storage.session 防 SW 被杀丢失 |
