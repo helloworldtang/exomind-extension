@@ -44,8 +44,8 @@
 
 | 层级 | 凭证 | 用户感知 |
 |---|---|---|
-| 1（默认） | `chrome.cookies` 读取 youhuale.cn 的 `token` cookie（HttpOnly，扩展特权可读），以 `Authorization: Bearer` 发送 | 装完即用，零配置 |
-| 2（过期/未登录） | popup 先自动探活：后台 fetch 受保护页走 302 续签链（SSO 会话还在则无感拿到新 token，免手动开页）；SSO 也没了才引导打开 youhuale.cn 登录 | 多数时候无感；否则点一下「去登录」 |
+| 1（默认） | `chrome.cookies` 读取 exomind.ai-as.cn 的 `token` cookie（HttpOnly，扩展特权可读），以 `Authorization: Bearer` 发往 exomind-api.ai-as.cn | 装完即用，零配置 |
+| 2（过期/未登录） | popup 先自动探活：后台 fetch 受保护页走 302 续签链（SSO 会话还在则无感拿到新 token，免手动开页）；SSO 也没了才引导打开 exomind.ai-as.cn 登录 | 多数时候无感；否则点一下「去登录」 |
 | 3（兜底） | options 页粘贴 API Key（`/ui/account` 生成），`X-API-Key` 发送 | 只给「从不在浏览器登录」的用户，藏在设置里 |
 
 **关键体验设计：登录后自动补存。** 未登录时点了存，插件记下 pending（含页面正文快照）；
@@ -72,12 +72,12 @@
 **不做**
 - 本地抽正文作主链路（服务端 trafilatura 更强；本地文本只作抓空时的兜底）
 - 剪藏列表管理视图（`/ui/browser?dir=raw` 已能看）
-- 智能标签推荐、批量导入、Firefox/Safari 版、可配服务器地址（固定 youhuale.cn）
+- 智能标签推荐、批量导入、Firefox/Safari 版、可配服务器地址（固定 exomind-api.ai-as.cn / exomind.ai-as.cn）
 
 ## 五、权限面与风险
 
-manifest 实际声明：`cookies` / `storage` / `contextMenus` / `activeTab` / `scripting` + `host_permissions: youhuale.cn、auth.ai-as.cc`。
-其中 `cookies` 是层级 1 的前提，`scripting` 是取页面可见文本的前提，两者都**只在 youhuale.cn 与当前活动页**范围内使用，未申请 `<all_urls>`。auth.ai-as.cc 是 v0.3.4 探活续签的前提：Chrome 对扩展持有 host permission 的域按同站处理，fetch 跟 302 到 auth 时 `SameSite=Lax` 的 SSO cookie 才会附带；插件不向该域发任何其他请求。
+manifest 实际声明：`cookies` / `storage` / `contextMenus` / `activeTab` / `scripting` + `host_permissions: exomind-api.ai-as.cn、exomind.ai-as.cn、auth.ai-as.cc`。
+其中 `cookies` 是层级 1 的前提，`scripting` 是取页面可见文本的前提，两者都**只在上述两域与当前活动页**范围内使用，未申请 `<all_urls>`。双域分工（v0.4.0）：API 存入走 exomind-api.ai-as.cn；登录/cookie/首页在 exomind.ai-as.cn——OIDC 回调固定注册在该域且 token cookie 是 host-only，cookie 不会落到 API 域。auth.ai-as.cc 是 v0.3.4 探活续签的前提：Chrome 对扩展持有 host permission 的域按同站处理，fetch 跟 302 到 auth 时 `SameSite=Lax` 的 SSO cookie 才会附带；插件不向该域发任何其他请求。
 
 | 风险 | 说明 | 应对 |
 |---|---|---|
@@ -102,10 +102,10 @@ manifest 实际声明：`cookies` / `storage` / `contextMenus` / `activeTab` / `
 1. 打开 `chrome://extensions/` → 右上角开「开发者模式」
 2. 「加载已解压的扩展程序」→ 选本目录（`exomind-extension/`）
 3. 验收清单：
-   - [x] 已在浏览器登录过 youhuale.cn → popup 显示「● 已就绪」→ 点「存入知识飞轮」→ 绿色「已存入」
-   - [x] 到 `youhuale.cn/ui/browser?dir=raw` 看到 `raw/articles/` 页面，frontmatter 带 `source_url`
+   - [x] 已在浏览器登录过 exomind.ai-as.cn → popup 显示「● 已就绪」→ 点「存入知识飞轮」→ 绿色「已存入」
+   - [x] 到 `exomind.ai-as.cn/ui/browser?dir=raw` 看到 `raw/articles/` 页面，frontmatter 带 `source_url`
    - [x] 未登录（或清 cookie）→ popup 变「● 未登录」→ 点「去登录」→ 登录完成 → 那篇自动存入
-   - [x] 只删 youhuale.cn 的 `token` cookie（SSO 保留）→ popup「检查登录态…」→ 自动变「● 已就绪」（v0.3.4 探活）
+   - [x] 只删 exomind.ai-as.cn 的 `token` cookie（SSO 保留）→ popup「检查登录态…」→ 自动变「● 已就绪」（v0.3.4 探活）
    - [x] 右键 →「把这个网页存进知识飞轮」→ 图标出现 ✓（失败为 !）
    - [x] options「测试连通」显示 ✓
    - [x] 登录态 SPA（豆包对话页）→ 服务端抓空时启用页面可见文本兜底
@@ -114,13 +114,13 @@ manifest 实际声明：`cookies` / `storage` / `contextMenus` / `activeTab` / `
 
 ```
 exomind-extension/
-├── manifest.json          # MV3 v0.3.4
+├── manifest.json          # MV3 v0.4.0
 ├── src/
 │   ├── background.js      # service worker：右键菜单、发请求、登录补存、badge、页面正文兜底
 │   ├── popup.html/js      # 一键存入 UI（状态、标题、标签、反馈、最近存入）
 │   ├── options.html/js    # API Key 兜底 + 连通测试
 │   └── lib/
-│       ├── config.js      # 常量（BASE_URL、cookie 名、来源标记）
+│       ├── config.js      # 常量（API_BASE/WEB_BASE 双域、cookie 名、来源标记）
 │       ├── auth.js        # 凭证链：cookie → API Key → null
 │       ├── extract.js     # 页面正文提取：站点策略（doubao）→ generic 兜底
 │       └── api.js         # /ingest/async 客户端 + 错误人话化
@@ -142,3 +142,4 @@ exomind-extension/
 | v0.3.2 | 修免责声明漏网：一行式「AI 生成可能有误 请核实」+ testid 容器 |
 | v0.3.3 | 修 popup 未登录误报：els 补 openHome/openOptions 键，boot() 前置防顶层炸点截断 |
 | v0.3.4 | 登录态探活：token 24h 过期但 SSO 长会话还在时，popup 自动走 302 续签链免手动开页（host_permissions 加 auth.ai-as.cc）；pendingIngest 落 storage.session 防 SW 被杀丢失 |
+| v0.4.0 | 切域：API 走 exomind-api.ai-as.cn，登录/cookie/首页留 exomind.ai-as.cn（OIDC 回调固定注册 + host-only cookie，双域不可合并为一） |

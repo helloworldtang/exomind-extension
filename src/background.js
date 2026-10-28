@@ -7,7 +7,7 @@
 
 import { resolveCredential, authState, AUTH } from "./lib/auth.js";
 import { ingestAsync, ApiError } from "./lib/api.js";
-import { SESSION_COOKIE, BASE_URL, HOME_URL } from "./lib/config.js";
+import { SESSION_COOKIE, WEB_BASE, HOME_URL, COOKIE_URL } from "./lib/config.js";
 import { pageExtractor } from "./lib/extract.js";
 
 const MENU_ID = "exomind-save-page";
@@ -152,7 +152,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg?.type === "open-login") {
     if (msg.pending) setPending(msg.pending); // 不必等落盘:cookie 落地远晚于此
-    chrome.tabs.create({ url: msg.loginUrl || BASE_URL });
+    chrome.tabs.create({ url: msg.loginUrl || WEB_BASE });
     sendResponse({ ok: true });
     return false;
   }
@@ -175,7 +175,8 @@ chrome.contextMenus.onClicked.addListener(async (_info, tab) => {
 // 登录完成（token cookie 落盘）→ 自动补存刚才那篇。
 chrome.cookies.onChanged.addListener(async (change) => {
   if (change.cookie?.name !== SESSION_COOKIE || change.removed) return;
-  if (!change.cookie.domain?.includes("youhuale.cn")) return;
+  // cookie 落在登录域（host-only），host_permissions 里有它，onChanged 才可靠
+  if (!change.cookie.domain?.includes(new URL(COOKIE_URL).host)) return;
   const p = await getPending();
   if (!p) return;
   await setPending(null);

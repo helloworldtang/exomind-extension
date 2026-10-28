@@ -31,7 +31,7 @@ $("test").addEventListener("click", async () => {
     const cred = await resolveCredential();
     if (!cred) {
       msg.className = "err";
-      msg.textContent = "还没登录，也没有密钥——先去 youhuale.cn 登录一次";
+      msg.textContent = "还没登录，也没有密钥——先去 exomind.ai-as.cn 登录一次";
       return;
     }
     await checkCredential(cred);

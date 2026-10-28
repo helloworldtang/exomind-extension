@@ -1,7 +1,7 @@
 // REST 客户端。端点契约见 myExoMindManager/src/exo/api/query.py。
 // 错误一律转成人话——用户不该看到 HTTP 状态码或 JSON。
 
-import { BASE_URL, ORIGIN_TAG } from "./config.js";
+import { API_BASE, ORIGIN_TAG } from "./config.js";
 
 export class ApiError extends Error {
   constructor(message, status, detail) {
@@ -48,7 +48,7 @@ function humanize(status, text) {
 async function request(path, { method = "GET", body, headers = {} } = {}) {
   let res;
   try {
-    res = await fetch(`${BASE_URL}${path}`, {
+    res = await fetch(`${API_BASE}${path}`, {
       method,
       headers: { "Content-Type": "application/json", ...headers },
       body: body ? JSON.stringify(body) : undefined,
