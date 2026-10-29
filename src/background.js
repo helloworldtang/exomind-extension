@@ -6,7 +6,7 @@
 //   用户不需要「存完 → 登录 → 回来再点一次」。
 
 import { resolveCredential, authState, AUTH } from "./lib/auth.js";
-import { ingestAsync, ApiError } from "./lib/api.js";
+import { ingestAsync, retryIngest, recentIngest, ApiError } from "./lib/api.js";
 import { SESSION_COOKIE, WEB_BASE, HOME_URL, COOKIE_URL } from "./lib/config.js";
 import { pageExtractor } from "./lib/extract.js";
 
@@ -112,7 +112,48 @@ async function submit({ url, title, tags, client } = {}) {
       await setPending({ url, title, tags, client });
       return { ok: false, needLogin: true, message: e.message };
     }
-    return { ok: false, message: e.message || "没存上，稍后再试" };
+    // 429 配额 / 422 超长：再点一次也不会变，别给用户一个注定失败的重试按钮
+    const hopeless = e instanceof ApiError && (e.status === 429 || e.status === 422);
+    return {
+      ok: false,
+      message: e.message || "没存上，稍后再试",
+      retryable: !hopeless,
+    };
+  }
+}
+
+/**
+ * 重试失败的 job。与「再点一次存入」不同：服务端复用原 payload 重入队，
+ * 不产生第二条记录——用户点的是「重试」不是「再存一遍」。
+ */
+async function retry(jobId) {
+  const cred = await resolveCredential();
+  if (!cred) return { ok: false, needLogin: true };
+  try {
+    const data = await retryIngest(jobId, cred);
+    return { ok: true, jobId: data.job_id };
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+      return { ok: false, needLogin: true, message: e.message };
+    }
+    if (e instanceof ApiError && e.status === 404) {
+      // 已被重试过 / 已成功 —— 都不是失败，说「没重试成功」是误导
+      return { ok: false, message: "这条已经处理好了，打开知识飞轮看看" };
+    }
+    return { ok: false, message: e.message || "重试没成功，稍后再试" };
+  }
+}
+
+/** 服务端真实的最近存入：状态可信（含失败），失败条目带 job_id 可重试。 */
+async function recent() {
+  const cred = await resolveCredential();
+  if (!cred) return { ok: false, needLogin: true };
+  try {
+    const data = await recentIngest(cred);
+    return { ok: true, items: data.items ?? [] };
+  } catch (e) {
+    const needLogin = e instanceof ApiError && (e.status === 401 || e.status === 403);
+    return { ok: false, needLogin, message: e.message };
   }
 }
 
@@ -142,6 +183,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg?.type === "probe-login") {
     probeLogin().then((ok) => sendResponse({ ok }));
+    return true;
+  }
+  if (msg?.type === "retry") {
+    retry(msg.jobId).then(sendResponse);
+    return true;
+  }
+  if (msg?.type === "recent") {
+    recent().then(sendResponse);
     return true;
   }
   if (msg?.type === "get-context") {

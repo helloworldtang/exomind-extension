@@ -60,6 +60,7 @@
       background: var(--brand-weak);
       color: var(--brand);
     }
+    #retryBtn { margin-top: 8px; padding: 7px 0; font: 500 13px/1 inherit; }
     #result { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; display: none; }
     #result.ok { display: block; background: #f0fdf4; color: var(--ok); }
     #result.err { display: block; background: #fef2f2; color: var(--err); }
@@ -68,14 +69,19 @@
     #recent h4 { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
     #recent ul { list-style: none; }
     #recent li {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       font-size: 12px;
       color: var(--fg);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      padding: 2px 0;
+      padding: 3px 0;
     }
-    #recent li::before { content: "·"; color: var(--muted); margin-right: 6px; }
+    #recent li::before { content: "·"; color: var(--muted); flex: none; }
+    #recent li .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #recent li .tag { flex: none; color: var(--muted); font-size: 11px; }
+    #recent li.failed .name { color: var(--err); }
+    #recent li a.retry { flex: none; color: var(--brand); cursor: pointer; font-size: 11px; }
+    #recent li a.retry:hover { text-decoration: underline; }
     footer {
       display: flex;
       justify-content: space-between;
@@ -102,6 +108,7 @@
       <input type="text" id="tags" placeholder="例如：AI, 产品" />
       <button id="saveBtn">存入知识飞轮</button>
       <div id="result"></div>
+      <button id="retryBtn" class="ghost hidden">重试</button>
     </section>
 
     <!-- 未登录：引导，不出现任何术语 -->
